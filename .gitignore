@@ -1,0 +1,22 @@
+# 编译产物：make.sh 输出的 cli/srv 二进制
+/build/
+
+# 依赖缓存：make.sh 每次都会执行 go mod vendor 重新生成
+/vendor/
+
+# Gradle 与 Android 构建目录
+/app/.gradle/
+/app/build/
+/app/app/build/
+
+# 本机 SDK 路径，各开发机不同
+/app/local.properties
+
+# 工具本地配置
+/.qoder/
+
+# 编辑器与系统临时文件
+.idea/
+*.iml
+.DS_Store
+*.swp
