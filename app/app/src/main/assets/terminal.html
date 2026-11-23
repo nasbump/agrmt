@@ -17,14 +17,15 @@
     text-size-adjust: 100%;
   }
   /* 会话列数在手机宽度下可能放不下，横向平移查看被遮住的右侧内容；
-     纵向历史滚动仍由 xterm 内部的 viewport 负责。 */
+     横屏等矮屏场景下 24 行画布高于容器时，纵向平移整块画布查看底部行。
+     画布装入容器时这两者都不产生滚动，纵向历史滚动仍由 xterm 内部的 viewport 负责。 */
   #term {
     width: 100%;
     height: 100%;
     padding: 4px;
     box-sizing: border-box;
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
   /* 横向平移靠手势完成，不显示滚动条，避免遮挡终端内容。 */
@@ -51,6 +52,11 @@
   var LINE_HEIGHT = 1.2;
   // 低于该字号时文字无法辨认，改为按最小字号渲染并允许横向平移。
   var MIN_FONT_SIZE = 11;
+  // 矮屏（横屏、键盘弹出）下 24 行按 MIN_FONT_SIZE 装不下时继续缩小；
+  // 缩到这个字号仍装不下就保留该字号，改为纵向平移整块画布。
+  var MIN_READABLE_FONT_SIZE = 10;
+  // 容器高度低于该值时视为布局尚未完成，先按此高度估算字号，避免算出过小的字号。
+  var MIN_AVAIL_HEIGHT = 160;
   var MAX_FONT_SIZE = 18;
   // 等宽字体单字符前进宽度与字号之比（无头 chromium 实测）。
   var CHAR_WIDTH_RATIO = 0.6;
@@ -80,15 +86,19 @@
   var desiredCols = 0;
   var desiredRows = 0;
 
-  // 按容器尺寸挑选字号：宽度放不下时保留最小可读字号，多出的列横向平移查看；
-  // 容器高度连最小字号都装不下 24 行时才继续缩小，优先保证整屏可见。
+  // 按容器尺寸挑选字号：宽度不足但高度足够时保留 MIN_FONT_SIZE（多出的列横向平移）；
+  // 高度不足 24 行时缩小到 MIN_READABLE_FONT_SIZE 为止，再放不下由 #term 纵向平移兜底。
   function computeFontSize(availW, availH, cols, rows) {
     var gap = letterSpacingDevice / dpr;
     var byWidth = (availW / cols - gap) / CHAR_WIDTH_RATIO;
     var byHeight = availH / (rows * CELL_HEIGHT_RATIO);
-    if (byHeight < MIN_FONT_SIZE) return Math.max(8, byHeight);
-    var fit = Math.floor(Math.min(byWidth, byHeight) * 2) / 2;
-    return Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, fit));
+    var fs;
+    if (byHeight >= MIN_FONT_SIZE) {
+      fs = Math.max(MIN_FONT_SIZE, Math.min(byWidth, byHeight));
+    } else {
+      fs = Math.max(MIN_READABLE_FONT_SIZE, byHeight);
+    }
+    return Math.min(MAX_FONT_SIZE, Math.floor(fs * 2) / 2);
   }
 
   window.agrmtSetSize = function (cols, rows) {
@@ -97,9 +107,12 @@
     desiredRows = rows;
     var host = document.getElementById('term');
     var availW = Math.max(80, host.clientWidth - 8);
-    var availH = Math.max(60, host.clientHeight - 8);
+    var availH = Math.max(MIN_AVAIL_HEIGHT, host.clientHeight - 8);
     term.options.fontSize = computeFontSize(availW, availH, cols, rows);
     term.resize(cols, rows);
+    // 尺寸变化后画布高度随之改变，重新贴底让光标所在行保持可见。
+    followBottom = true;
+    scheduleScrollY();
   };
 
   window.agrmtFit = function () {
@@ -114,7 +127,7 @@
     var bin = atob(b64);
     var bytes = new Uint8Array(bin.length);
     for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    term.write(bytes, syncViewport);
+    term.write(bytes, function () { syncViewport(); scheduleScrollY(); });
   };
 
   // xterm 的滚动区高度依赖 requestAnimationFrame 回调，页面不可见时该回调会被
@@ -122,6 +135,35 @@
   function syncViewport() {
     var vc = term._core && term._core.viewport;
     if (vc && typeof vc.syncScrollArea === 'function') vc.syncScrollArea(true);
+  }
+
+  // 矮屏下画布（rows 行）可能高于 #term，xterm 只按可见区画顶部若干行，
+  // 把 #term 纵向滚到底即可看到底部行。用户手动上滑后不再自动贴底，
+  // 回到底部或执行尺寸变化时恢复跟随。
+  var followBottom = true;
+  var scrollYScheduled = false;
+
+  function scheduleScrollY() {
+    if (scrollYScheduled) return;
+    scrollYScheduled = true;
+    // 等 xterm 完成本次渲染后再量画布高度。
+    requestAnimationFrame(function () {
+      scrollYScheduled = false;
+      if (followBottom) scrollToBottom();
+    });
+  }
+
+  function scrollToBottom() {
+    var host = document.getElementById('term');
+    var max = host.scrollHeight - host.clientHeight;
+    if (max > 0 && Math.abs(host.scrollTop - max) > 1) host.scrollTop = max;
+  }
+
+  // 只有画布确实高于容器（存在纵向可滚动空间）时才让手势交给浏览器平移整块画布；
+  // 画布装入容器时纵向手势仍留给 xterm 滚动历史。
+  function canScrollY() {
+    var host = document.getElementById('term');
+    return host.scrollHeight - host.clientHeight > 1;
   }
 
   window.agrmtReset = function () {
@@ -152,12 +194,13 @@
   setTimeout(pollModes, 250);
 
   // xterm 自己会拦截并消费 touchmove（用于纵向滚动历史），这里在捕获阶段
-  // 先记下手势，横向主导时手动平移 #term，避免整行内容被右侧裁掉。
+  // 先记下手势：横向主导时手动平移 #term，避免整行内容被右侧裁掉；
+  // 矮屏下纵向主导时放开事件，让浏览器平移整块画布看到底部行。
   var host = document.getElementById('term');
   var panStartX = 0;
   var panStartY = 0;
   var panStartLeft = 0;
-  var panState = 0; // 0 空闲，1 待判定方向，2 横向平移
+  var panState = 0; // 0 空闲，1 待判定方向，2 横向平移，3 纵向平移画布
 
   host.addEventListener('touchstart', function (e) {
     if (e.touches.length !== 1) {
@@ -176,14 +219,35 @@
     var dy = e.touches[0].clientY - panStartY;
     if (panState === 1) {
       if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-      panState = Math.abs(dx) > Math.abs(dy) ? 2 : 0;
-      if (panState !== 2) return;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        panState = 2;
+      } else if (canScrollY()) {
+        // 画布高于容器：纵向手势用于查看底部行，跟随状态关闭。
+        panState = 3;
+        followBottom = false;
+      } else {
+        panState = 0;
+        return;
+      }
     }
-    // 横向平移时拦住事件，避免 xterm 同时把它当成纵向历史滚动。
-    e.preventDefault();
-    e.stopPropagation();
-    host.scrollLeft = panStartLeft - dx;
+    if (panState === 2) {
+      // 横向平移时拦住事件，避免 xterm 同时把它当成纵向历史滚动。
+      e.preventDefault();
+      e.stopPropagation();
+      host.scrollLeft = panStartLeft - dx;
+      return;
+    }
+    if (panState === 3) {
+      // 放开纵向滚动：阻止 xterm 把它当成历史滚动，由浏览器平移画布。
+      e.stopPropagation();
+    }
   }, { capture: true, passive: false });
+
+  // 画布纵向平移状态以实际滚动位置为准：停在底部时跟随新输出，离开底部就停住。
+  host.addEventListener('scroll', function () {
+    var max = host.scrollHeight - host.clientHeight;
+    if (max > 0) followBottom = host.scrollTop >= max - 2;
+  }, { capture: true, passive: true });
 
   function endPan() { panState = 0; }
   host.addEventListener('touchend', endPan, { capture: true, passive: true });
