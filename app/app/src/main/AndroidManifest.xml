@@ -5,6 +5,7 @@
 
     <application
         android:allowBackup="true"
+        android:hasFragileUserData="true"
         android:label="agrmt"
         android:supportsRtl="true"
         android:theme="@style/Theme.Agrmt"

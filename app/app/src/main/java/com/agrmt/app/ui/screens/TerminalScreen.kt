@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,10 +28,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,13 +41,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.agrmt.app.model.SessionStatus
 import com.agrmt.app.term.Keys
 import com.agrmt.app.ui.MainViewModel
+import kotlinx.coroutines.delay
 
 /**
  * 终端页：xterm.js 渲染 agent 输出，提示词输入与快捷按键放在终端下方。
@@ -52,8 +62,9 @@ import com.agrmt.app.ui.MainViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TerminalScreen(vm: MainViewModel) {
+    var showHistory by remember { mutableStateOf(false) }
     Scaffold(
-        topBar = { TerminalHeader(vm) },
+        topBar = { TerminalHeader(vm, onHistory = { showHistory = true }) },
     ) { pad ->
         Column(modifier = Modifier.fillMaxSize().padding(pad)) {
             // 输入区按内容取高：两行快捷键比 20% 高度更高，固定比例会把按键挤出屏幕。
@@ -63,11 +74,14 @@ fun TerminalScreen(vm: MainViewModel) {
             PromptPanel(vm, modifier = Modifier.fillMaxWidth())
         }
     }
+    if (showHistory) {
+        HistoryDialog(vm, onDismiss = { showHistory = false })
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TerminalHeader(vm: MainViewModel) {
+private fun TerminalHeader(vm: MainViewModel, onHistory: () -> Unit) {
     val name = vm.attachedName ?: "会话"
     val st = when (vm.sessionStatus) {
         SessionStatus.ONLINE -> "在线"
@@ -82,9 +96,83 @@ private fun TerminalHeader(vm: MainViewModel) {
             Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
         actions = {
+            TextButton(onClick = onHistory) { Text("历史") }
             TextButton(onClick = { vm.closeSession() }) { Text("返回") }
         },
     )
+}
+
+/**
+ * 历史输出页：展示从原始输出还原的纯文本。
+ *
+ * 全屏 TUI（如 codex）使用备用屏幕，xterm 没有可回滚的内容，滑动只会发方向键；
+ * 这个页面直接读取 app 端累积的文本历史，任何 agent 都能回溯查看。
+ */
+@Composable
+private fun HistoryDialog(vm: MainViewModel, onDismiss: () -> Unit) {
+    var lines by remember { mutableStateOf(vm.terminal.historyLines()) }
+    // 打开时先定位到末尾；行还没加载完时由下面的 effect 在首次刷新后补位。
+    val listState = rememberLazyListState()
+    var jumpedToBottom by remember { mutableStateOf(false) }
+
+    // 打开期间定时刷新；停在底部时跟随最新输出，用户上翻后保持当前位置。
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(500)
+            val latest = vm.terminal.historyLines()
+            if (latest == lines) continue
+            val atBottom = listState.layoutInfo.let { info ->
+                val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+                last >= info.totalItemsCount - 1
+            }
+            lines = latest
+            if ((!jumpedToBottom || atBottom) && latest.isNotEmpty()) {
+                jumpedToBottom = true
+                listState.scrollToItem(latest.size - 1)
+            }
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF101014)) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "历史输出（${lines.size} 行）",
+                        color = Color(0xFFE0E0E0),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onDismiss) { Text("关闭") }
+                }
+                if (lines.isEmpty()) {
+                    Text(
+                        "暂无历史输出",
+                        color = Color(0xFF9E9E9E),
+                        modifier = Modifier.padding(16.dp),
+                    )
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                    ) {
+                        items(lines) { line ->
+                            Text(
+                                line,
+                                color = Color(0xFFE0E0E0),
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp,
+                                softWrap = true,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @SuppressLint("SetJavaScriptEnabled")

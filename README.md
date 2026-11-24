@@ -59,8 +59,11 @@ sdk.dir=/opt/platforms/android
 
 ```sh
 cd app
-./gradlew :app:assembleDebug    # 产物: app/app/build/outputs/apk/debug/app-debug.apk
+./make.sh                       # 自动递增版本号后编译，产物: app/app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:assembleDebug    # 直接编译，不改版本号
 ```
+
+`make.sh` 每次运行会把 `versionCode` 加一，并把 `versionName` 同步为 `1.<versionCode>`，服务器列表页标题右侧展示当前版本号。
 
 依赖已缓存时可加 `--offline` 离线编译。
 
@@ -100,11 +103,15 @@ cli 会以 80x24 为默认尺寸启动 agent，并在本地终端尺寸变化（
 
 ### 3. 使用 app
 
-1. 安装 `app-debug.apk`，填写 srv 地址与分组（地址可省略协议，例如 `192.168.1.10:8989`），保存后点击连接
+1. 安装 `app-debug.apk`，填写 srv 地址与分组（地址可省略协议，例如 `192.168.1.10:8989`），保存后点击连接。页面标题右侧显示当前 app 版本
 2. 在会话列表中选择要查看的会话
 3. 上方是 agent 输出，下方是提示词输入框和两行快捷按键：方向键，以及 `/`、`Esc`、`Tab`、`Shift+Tab`、`Enter`
 
-app 仅支持竖屏。终端字号会根据屏幕自动缩放；内容放不下时可以横向/纵向平移查看。上下滑动终端区域可翻看历史输出（矮屏下先平移画布，贴边后继续翻历史）；全屏 TUI 类 agent（如 codex）使用备用屏幕，没有可回滚的历史，滑动会转成上/下方向键。
+app 仅支持竖屏。终端字号会根据屏幕自动缩放；内容放不下时可以横向/纵向平移查看。
+
+终端页右上角的「历史」按钮可以打开纯文本历史：app 在接收输出时同步还原一份去掉颜色转义的可翻阅文本，因此全屏 TUI 类 agent（如 codex，使用备用屏幕，xterm 本身没有回滚内容）也能回看之前的输出。历史界面会跟随最新输出，上翻后保持当前位置。
+
+已保存的服务器配置会备份到公共目录 `Download/agrmt/agrmt-servers.json`；卸载时系统默认保留应用数据（`hasFragileUserData`），重装后配置自动恢复。
 
 系统返回键逐级后退：终端页返回会话列表，会话列表页断开连接返回服务器列表。
 

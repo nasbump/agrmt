@@ -26,6 +26,10 @@ class TerminalController {
     private val pending = ByteArrayOutputStream()
     private var flushPosted = false
 
+    // 原始输出的纯文本历史：xterm 在备用屏幕（全屏 TUI）下没有回滚，
+    // 这里独立记录一份，供历史查看界面使用。
+    private val history = HistoryBuffer()
+
     // 记录最近一次会话尺寸：status 可能早于页面加载完成到达，
     // 页面就绪后需要重新套用，避免终端停留在默认 80x24。
     @Volatile
@@ -92,8 +96,12 @@ class TerminalController {
     /** 清屏并恢复到初始状态；待写入字节一并丢弃，由调用方随后补发回放。 */
     fun reset() {
         synchronized(pending) { pending.reset() }
+        history.clear()
         eval("agrmtReset()")
     }
+
+    /** 原始输出还原出的纯文本历史行，供历史查看界面读取。 */
+    fun historyLines(): List<String> = history.snapshot()
 
     /** 用会话的行列数设置终端尺寸（页面会缩放字号以适配容器）。 */
     fun setSize(cols: Int, rows: Int) {
@@ -112,6 +120,7 @@ class TerminalController {
     /** 追加 agent 输出的原始字节。 */
     fun append(bytes: ByteArray) {
         if (bytes.isEmpty()) return
+        history.append(bytes)
         synchronized(pending) { pending.write(bytes) }
         scheduleFlush()
     }

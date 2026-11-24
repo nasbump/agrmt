@@ -19,9 +19,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.agrmt.app.BuildConfig
 import com.agrmt.app.data.ServerConfig
 import com.agrmt.app.ui.MainViewModel
 
@@ -32,7 +34,18 @@ fun ServerScreen(vm: MainViewModel) {
     var group by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("agrmt 服务器", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "agrmt 服务器",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
         Text(
             "填写 agrmt-srv 的地址与分组，保存后点击列表项连接。",
             style = MaterialTheme.typography.bodySmall,
