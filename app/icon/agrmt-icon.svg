@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">agrmt app icon</title>
+  <desc id="desc">A stylized letter A with a terminal prompt and a mobile control interface, representing remote management of a coding agent.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#159BFA"/>
+      <stop offset=".52" stop-color="#214BFA"/>
+      <stop offset="1" stop-color="#4B18E8"/>
+    </linearGradient>
+    <linearGradient id="letter" x1=".15" y1="0" x2=".82" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#C9E4FF"/>
+    </linearGradient>
+    <linearGradient id="orbit" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".58" stop-color="#DDF5FF"/>
+      <stop offset="1" stop-color="#9FC8FF"/>
+    </linearGradient>
+    <linearGradient id="phone" x1="0" y1="0" x2=".9" y2="1">
+      <stop offset="0" stop-color="#203F85"/>
+      <stop offset="1" stop-color="#101F50"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#18E9C1"/>
+      <stop offset="1" stop-color="#27D9E9"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="170%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="18" result="blur"/>
+      <feOffset dy="18" result="offset"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".28"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- App tile -->
+  <rect x="42" y="42" width="940" height="940" rx="238" fill="url(#bg)"/>
+  <circle cx="235" cy="205" r="220" fill="#66D9FF" opacity=".08"/>
+  <circle cx="840" cy="850" r="260" fill="#711CFF" opacity=".12"/>
+
+  <!-- Abstract orbital link -->
+  <path d="M112 686 C195 526 431 373 699 331 C850 308 933 348 925 415 C914 512 704 657 461 755 C258 837 106 827 101 748 C98 728 102 706 112 686Z"
+        fill="none" stroke="url(#orbit)" stroke-width="34" stroke-linecap="round" opacity=".98"/>
+  <path d="M137 687 C250 542 472 421 700 383" fill="none" stroke="#A8D8FF" stroke-width="9" stroke-linecap="round" opacity=".22"/>
+
+  <!-- Letter A, deliberately broad and simple for small-size legibility -->
+  <path d="M214 784 L421 350 Q462 263 518 263 L550 263 Q607 263 648 350 L833 704 Q848 734 829 753 Q820 763 801 763 L694 763 L554 488 Q541 462 527 462 Q513 462 500 488 L364 784 Z"
+        fill="url(#letter)"/>
+  <path d="M430 676 L489 558 Q505 527 527 527 Q550 527 567 559 L628 676 Q591 667 550 667 L489 667 Q458 667 430 676Z"
+        fill="#173A9D" opacity=".98"/>
+
+  <!-- Terminal prompt inside the A -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="17" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M452 486 L496 521 L452 556"/>
+    <path d="M523 557 H573"/>
+  </g>
+
+  <!-- Phone / human-in-the-loop control panel -->
+  <g transform="rotate(8 704 665)" filter="url(#shadow)">
+    <rect x="566" y="458" width="286" height="398" rx="62" fill="#A9D7FF" opacity=".38"/>
+    <rect x="552" y="444" width="286" height="398" rx="62" fill="#F7FBFF"/>
+    <rect x="565" y="457" width="260" height="372" rx="50" fill="url(#phone)"/>
+    <rect x="664" y="474" width="62" height="7" rx="4" fill="#8299CE" opacity=".5"/>
+    <circle cx="619" cy="530" r="15" fill="url(#cyan)" filter="url(#glow)"/>
+    <rect x="650" y="516" width="112" height="12" rx="6" fill="#7FA1E7" opacity=".55"/>
+    <rect x="604" y="570" width="157" height="23" rx="11.5" fill="#4967B3" opacity=".72"/>
+    <rect x="604" y="570" width="126" height="23" rx="11.5" fill="url(#cyan)"/>
+    <rect x="604" y="610" width="102" height="22" rx="11" fill="#6F89CB" opacity=".72"/>
+    <rect x="590" y="672" width="188" height="86" rx="28" fill="#3657A7" opacity=".92"/>
+    <path d="M665 711 L716 693 Q722 691 718 698 L688 738 Q684 743 681 737 L674 721 L660 716 Q654 713 665 711Z" fill="#FFFFFF"/>
+  </g>
+</svg>
