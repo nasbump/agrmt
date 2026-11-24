@@ -53,6 +53,9 @@ func serveCLI(h *hub, w http.ResponseWriter, r *http.Request) {
 	go c.writeLoop()
 	defer c.close()
 
+	cl := newConnLog("cli", r, "")
+	defer cl.closed()
+
 	var (
 		sess  *session
 		group string
@@ -68,6 +71,8 @@ func serveCLI(h *hub, w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			group, name = m.Group, m.Name
+			cl.identify(group, name)
+			cl.connected()
 			sess = h.session(group, name, true)
 			sess.attachCLI(c, m)
 		case proto.TypeResize:
@@ -131,6 +136,10 @@ func serveApp(h *hub, w http.ResponseWriter, r *http.Request) {
 	defer c.close()
 	defer h.removeApp(group, c)
 
+	cl := newConnLog("android", r, group)
+	cl.connected()
+	defer cl.closed()
+
 	h.addApp(group, c)
 
 	var attached *session
@@ -157,10 +166,12 @@ func serveApp(h *hub, w http.ResponseWriter, r *http.Request) {
 				c.sendError("会话不存在: " + m.Name)
 				continue
 			}
+			cl.identify(group, m.Name)
 			if attached != nil && attached != s {
 				attached.detachApp(c)
 			}
 			attached = s
+			cl.sessionAttached()
 			s.attachApp(c)
 		case proto.TypeDetach:
 			if attached != nil {

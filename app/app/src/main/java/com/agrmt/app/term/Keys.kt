@@ -2,6 +2,7 @@ package com.agrmt.app.term
 
 /** 快捷按键对应的字节序列。光标键序列取决于 agent 是否启用了 DECCKM。 */
 object Keys {
+    const val ESC = "\u001b"
     const val ENTER = "\r"
     const val TAB = "\t"
     const val SHIFT_TAB = "\u001b[Z"

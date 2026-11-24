@@ -1,5 +1,6 @@
 package com.agrmt.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +20,9 @@ import com.agrmt.app.ui.screens.TerminalScreen
 /** 按阶段切换三个页面：服务器列表 → 会话列表 → 终端。 */
 @Composable
 fun AgrmtApp(vm: MainViewModel) {
+    // 系统返回键逐级退回上一页；仅在服务器列表页放行，交给系统退出 app。
+    BackHandler(enabled = vm.stage != Stage.SERVERS) { vm.onBack() }
+
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when (vm.stage) {
             Stage.SERVERS -> ServerScreen(vm)

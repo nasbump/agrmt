@@ -1,6 +1,8 @@
 package com.agrmt.app.ui
 
 import android.app.Application
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,19 +14,39 @@ import com.agrmt.app.model.MsgType
 import com.agrmt.app.model.SessionInfo
 import com.agrmt.app.model.SessionStatus
 import com.agrmt.app.net.AgrmtClient
+import com.agrmt.app.net.buildAppUrl
 import com.agrmt.app.term.TerminalController
 
 /** 界面所处的阶段。 */
 enum class Stage { SERVERS, SESSIONS, TERMINAL }
 
+/** 重连退避：第 attempt 次（从 0 开始）等待的毫秒数，1s 起翻倍，封顶 10s。 */
+internal fun reconnectDelayMs(attempt: Int): Long =
+    minOf(MAX_RECONNECT_DELAY_MS, BASE_RECONNECT_DELAY_MS shl minOf(attempt, 4))
+
+private const val BASE_RECONNECT_DELAY_MS = 1_000L
+private const val MAX_RECONNECT_DELAY_MS = 10_000L
+
 /** 主界面状态与 srv 连接的唯一管理者。 */
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val store = ConfigStore(app)
-    private var client: AgrmtClient? = null
     private var active: ServerConfig? = null
 
+    private val main = Handler(Looper.getMainLooper())
+
+    // 重连采用指数退避（1s 起，封顶 10s），成功后清零。
+    private var reconnectAttempt = 0
+    private var reconnectPending = false
+    private val reconnectRunnable = Runnable {
+        reconnectPending = false
+        if (active != null && client == null) startClient()
+    }
+
     val terminal = TerminalController()
+
+    @Volatile
+    private var client: AgrmtClient? = null
 
     var stage by mutableStateOf(Stage.SERVERS)
         private set
@@ -81,40 +103,98 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 连接指定的 srv；成功后自动进入会话列表。 */
     fun connect(cfg: ServerConfig) {
-        disconnect()
+        stopConnection()
         notice = null
         sessions = emptyList()
         attachedName = null
+        attachGen = -1
         sessionStatus = null
         exitCode = null
+        active = cfg
+        startClient()
+    }
 
-        val c = AgrmtClient(object : AgrmtClient.Listener {
+    /** 建立一次连接；意外断开后由 onClosed 统一安排重连。 */
+    private fun startClient() {
+        val cfg = active ?: return
+        // 地址非法时 AgrmtClient 会同步回调 onClosed，这里先校验，避免误触发重连。
+        try {
+            buildAppUrl(cfg.addr, cfg.group)
+        } catch (e: IllegalArgumentException) {
+            notice = e.message ?: "srv 地址无效"
+            active = null
+            stage = Stage.SERVERS
+            return
+        }
+
+        lateinit var c: AgrmtClient
+        // 是否成功建立过连接：只有连上之后再断开才自动重连，
+        // 首次连接就失败说明地址或网络有问题，直接提示用户，避免无意义的重试。
+        var opened = false
+        c = AgrmtClient(object : AgrmtClient.Listener {
             override fun onOpen() {
+                if (client !== c) return
+                opened = true
                 connected = true
-                stage = Stage.SESSIONS
+                reconnectAttempt = 0
+                notice = null
+                if (stage == Stage.SERVERS) stage = Stage.SESSIONS
+                // 重连后重新接入当前会话，srv 会重发 reset、状态与全量回放；
+                // 页面未就绪时交给 onReady 发起，避免重复请求。
+                attachedName?.let { name ->
+                    terminal.reset()
+                    if (terminal.isReady) {
+                        attachGen = terminal.readyGen
+                        c.attach(name)
+                    } else {
+                        attachGen = -1
+                    }
+                }
             }
 
-            override fun onMessage(m: Message) = handleMessage(m)
+            override fun onMessage(m: Message) {
+                if (client !== c) return
+                handleMessage(m)
+            }
 
             override fun onOutput(bytes: ByteArray) {
+                if (client !== c) return
                 terminal.append(bytes)
             }
 
             override fun onClosed(reason: String) {
+                if (client !== c) return
+                client = null
                 connected = false
-                notice = "连接已断开: $reason"
-                if (attachedName != null) {
+                if (active == null) return
+                if (!opened) {
+                    notice = "连接失败: $reason"
+                    active = null
                     attachedName = null
-                    stage = Stage.SESSIONS
+                    attachGen = -1
+                    stage = Stage.SERVERS
+                    return
                 }
+                notice = "连接已断开，正在重连: $reason"
+                scheduleReconnect()
             }
         })
         client = c
-        active = cfg
+        connected = false
         if (!c.connect(cfg.addr, cfg.group)) {
-            client = null
-            active = null
+            // 连接没能建立（地址非法）：停止重连并退回服务器列表。
+            stopConnection()
+            stage = Stage.SERVERS
         }
+    }
+
+    /** 按指数退避安排下一次重连，连接成功后退避清零。 */
+    private fun scheduleReconnect() {
+        if (reconnectPending) return
+        reconnectPending = true
+        val delay = reconnectDelayMs(reconnectAttempt)
+        reconnectAttempt++
+        main.postDelayed(reconnectRunnable, delay)
     }
 
     private fun handleMessage(m: Message) {
@@ -163,18 +243,39 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         stage = Stage.SESSIONS
     }
 
-    /** 从终端页断开服务器，回到服务器列表。 */
+    /** 从终端页断开服务器，回到服务器列表；同时取消自动重连。 */
     fun disconnect() {
-        attachedName?.let { client?.detach(it) }
-        client?.close()
-        client = null
-        active = null
-        connected = false
+        stopConnection()
         attachedName = null
+        attachGen = -1
         sessionStatus = null
         exitCode = null
         sessions = emptyList()
         stage = Stage.SERVERS
+    }
+
+    /** 关闭连接并取消待执行的重连；不改变界面阶段。 */
+    private fun stopConnection() {
+        main.removeCallbacks(reconnectRunnable)
+        reconnectPending = false
+        reconnectAttempt = 0
+        val c = client
+        client = null
+        if (c != null) {
+            attachedName?.let { c.detach(it) }
+            c.close()
+        }
+        connected = false
+        active = null
+    }
+
+    /** 系统返回键：终端页退回会话列表，会话列表页断开连接回到服务器列表。 */
+    fun onBack() {
+        when (stage) {
+            Stage.TERMINAL -> closeSession()
+            Stage.SESSIONS -> disconnect()
+            Stage.SERVERS -> Unit
+        }
     }
 
     fun dismissNotice() {
@@ -197,9 +298,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val activeConfig: ServerConfig? get() = active
 
     override fun onCleared() {
+        main.removeCallbacks(reconnectRunnable)
+        reconnectPending = false
         client?.close()
         client = null
         terminal.unbind()
         super.onCleared()
+    }
+
+    private companion object {
+        const val BASE_RECONNECT_DELAY_MS = 1_000L
+        const val MAX_RECONNECT_DELAY_MS = 10_000L
     }
 }
