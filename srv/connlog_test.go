@@ -12,11 +12,12 @@ import (
 	"agrmt/internal/proto"
 )
 
-func TestRemoteIPStripsPort(t *testing.T) {
+// 日志中的来源地址要保留端口，便于区分 NAT 后同一 IP 的多条连接。
+func TestRemoteAddrKeepsPort(t *testing.T) {
 	r := httptest.NewRequest("GET", "/ws/app", nil)
 	r.RemoteAddr = "192.168.1.20:51234"
-	if got := remoteIP(r); got != "192.168.1.20" {
-		t.Fatalf("来源 IP 应为 192.168.1.20，实际 %q", got)
+	if got := newConnLog("android", r, "").remote; got != "192.168.1.20:51234" {
+		t.Fatalf("来源地址应为 192.168.1.20:51234，实际 %q", got)
 	}
 }
 
@@ -29,7 +30,7 @@ func TestConnLogFallsBackForUnknownIdentity(t *testing.T) {
 	if !cl.logged {
 		t.Fatal("closed 应补打接入日志")
 	}
-	if cl.remote != "10.0.0.9" || cl.group != "" || cl.session != "" {
+	if cl.remote != "10.0.0.9:1234" || cl.group != "" || cl.session != "" {
 		t.Fatalf("连接信息不符: %+v", cl)
 	}
 	if orDash(cl.group) != "-" || orDash(cl.session) != "-" {
@@ -101,8 +102,8 @@ func TestCLIConnectionLogged(t *testing.T) {
 			if !strings.Contains(out, "存活=") {
 				t.Fatalf("断开日志缺少存活时间: %s", out)
 			}
-			if !strings.Contains(out, "ip=127.0.0.1") {
-				t.Fatalf("日志缺少来源 IP: %s", out)
+			if !strings.Contains(out, "addr=127.0.0.1:") {
+				t.Fatalf("日志缺少来源 IP 与端口: %s", out)
 			}
 			return
 		}
@@ -129,7 +130,8 @@ func TestAppConnectionLogged(t *testing.T) {
 	deadline := time.Now().Add(3 * time.Second)
 	for {
 		out := readLog()
-		if strings.Contains(out, "[连接断开] apptype=android ip=127.0.0.1 group=g session=s") {
+		if strings.Contains(out, "[连接断开] apptype=android addr=127.0.0.1:") &&
+			strings.Contains(out, "group=g session=s") {
 			if !strings.Contains(out, "[连接接入] apptype=android") {
 				t.Fatalf("缺少 app 接入日志: %s", out)
 			}

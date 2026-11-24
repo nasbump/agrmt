@@ -72,11 +72,11 @@ cd app
 ./build/agrmt-srv -listen :8989
 ```
 
-srv 会为每条连接打印接入与断开日志，包含来源 IP、分组、apptype（`cli`/`android`）、会话名，断开时附带存活时间：
+srv 会为每条连接打印接入与断开日志，包含来源 IP 与端口、分组、apptype（`cli`/`android`）、会话名，断开时附带存活时间：
 
 ```
-[连接接入] apptype=cli ip=192.168.1.21 group=dev session=codex
-[连接断开] apptype=android ip=192.168.1.30 group=dev session=codex 存活=1h12m5s
+[连接接入] apptype=cli addr=192.168.1.21:51544 group=dev session=codex
+[连接断开] apptype=android addr=192.168.1.30:40218 group=dev session=codex 存活=1h12m5s
 ```
 
 ### 2. 启动 cli 与 agent
@@ -104,7 +104,7 @@ cli 会以 80x24 为默认尺寸启动 agent，并在本地终端尺寸变化（
 2. 在会话列表中选择要查看的会话
 3. 上方是 agent 输出，下方是提示词输入框和两行快捷按键：方向键，以及 `/`、`Esc`、`Tab`、`Shift+Tab`、`Enter`
 
-app 仅支持竖屏。终端字号会根据屏幕自动缩放；内容放不下时可以横向/纵向平移查看。
+app 仅支持竖屏。终端字号会根据屏幕自动缩放；内容放不下时可以横向/纵向平移查看。上下滑动终端区域可翻看历史输出（矮屏下先平移画布，贴边后继续翻历史）；全屏 TUI 类 agent（如 codex）使用备用屏幕，没有可回滚的历史，滑动会转成上/下方向键。
 
 系统返回键逐级后退：终端页返回会话列表，会话列表页断开连接返回服务器列表。
 
