@@ -182,7 +182,6 @@ class HistoryBuffer(private val maxChars: Int = DEFAULT_MAX_CHARS) {
         val params: List<Int> =
             if (raw.isEmpty()) emptyList() else raw.split(';').map { it.toIntOrNull() ?: 0 }
         fun arg(i: Int): Int = if (i < params.size && params[i] > 0) params[i] else 1
-        val p0 = params.firstOrNull() ?: 0
 
         when (final) {
             'H', 'f' -> {
