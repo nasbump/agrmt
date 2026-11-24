@@ -242,15 +242,15 @@ private fun PromptPanel(
             ) { Text("发送") }
         }
 
-        // 快捷按键分两行：第一行方向键，第二行常用控制键。
+        // 快捷按键分两行：第一行方向键与常用符号，第二行控制键。
         KeyRow {
             Key("↑") { vm.sendArrow('u') }
             Key("↓") { vm.sendArrow('d') }
             Key("←") { vm.sendArrow('l') }
             Key("→") { vm.sendArrow('r') }
+            Key("/") { vm.sendQuick(Keys.SLASH) }
         }
         KeyRow {
-            Key("/") { vm.sendQuick(Keys.SLASH) }
             Key("Esc") { vm.sendQuick(Keys.ESC) }
             Key("Tab") { vm.sendQuick(Keys.TAB) }
             Key("⇧Tab") { vm.sendQuick(Keys.SHIFT_TAB) }
