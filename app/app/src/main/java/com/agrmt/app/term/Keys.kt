@@ -8,6 +8,9 @@ object Keys {
     const val SHIFT_TAB = "\u001b[Z"
     const val SLASH = "/"
 
+    /** 退格键发送 DEL（0x7f），与 xterm 键盘产生的字节一致。 */
+    const val BACKSPACE = "\u007f"
+
     /** dir 取值 u/d/l/r，分别对应上/下/左/右。 */
     fun arrow(dir: Char, applicationCursorKeys: Boolean): String {
         val suffix = when (dir) {

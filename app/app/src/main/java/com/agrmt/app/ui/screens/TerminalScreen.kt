@@ -254,6 +254,7 @@ private fun PromptPanel(
             Key("Esc") { vm.sendQuick(Keys.ESC) }
             Key("Tab") { vm.sendQuick(Keys.TAB) }
             Key("⇧Tab") { vm.sendQuick(Keys.SHIFT_TAB) }
+            Key("⌫") { vm.sendQuick(Keys.BACKSPACE) }
             Key("Enter") { vm.sendQuick(Keys.ENTER) }
         }
     }

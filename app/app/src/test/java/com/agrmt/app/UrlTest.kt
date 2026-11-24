@@ -65,5 +65,6 @@ class KeysTest {
         assertEquals("\t", Keys.TAB)
         assertEquals("\u001b[Z", Keys.SHIFT_TAB)
         assertEquals("/", Keys.SLASH)
+        assertEquals("\u007f", Keys.BACKSPACE)
     }
 }
