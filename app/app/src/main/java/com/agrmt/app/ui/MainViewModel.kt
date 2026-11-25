@@ -20,6 +20,10 @@ import com.agrmt.app.term.TerminalController
 /** 界面所处的阶段。 */
 enum class Stage { SERVERS, SESSIONS, TERMINAL }
 
+/** 终端页顶部栏的副标题：服务器地址 - 分组名；未连接时为空。 */
+internal fun serverGroupLabel(cfg: ServerConfig?): String =
+    cfg?.let { "${it.addr} - ${it.group}" } ?: ""
+
 /** 重连退避：第 attempt 次（从 0 开始）等待的毫秒数，1s 起翻倍，封顶 10s。 */
 internal fun reconnectDelayMs(attempt: Int): Long =
     minOf(MAX_RECONNECT_DELAY_MS, BASE_RECONNECT_DELAY_MS shl minOf(attempt, 4))

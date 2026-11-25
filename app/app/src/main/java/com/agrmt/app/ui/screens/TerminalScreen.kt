@@ -52,6 +52,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.agrmt.app.model.SessionStatus
 import com.agrmt.app.term.Keys
 import com.agrmt.app.ui.MainViewModel
+import com.agrmt.app.ui.serverGroupLabel
 import kotlinx.coroutines.delay
 
 /**
@@ -90,10 +91,23 @@ private fun TerminalHeader(vm: MainViewModel, onHistory: () -> Unit) {
         else -> ""
     }
     val title = if (st.isEmpty()) name else "$name · $st"
+    val serverLabel = serverGroupLabel(vm.activeConfig)
 
     TopAppBar(
         title = {
-            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column {
+                if (serverLabel.isNotEmpty()) {
+                    // 左上角小字：服务器地址 - 分组，位于会话名上方。
+                    Text(
+                        serverLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         },
         actions = {
             TextButton(onClick = onHistory) { Text("历史") }

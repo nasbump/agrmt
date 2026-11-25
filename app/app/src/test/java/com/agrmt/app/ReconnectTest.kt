@@ -1,7 +1,9 @@
 package com.agrmt.app
 
+import com.agrmt.app.data.ServerConfig
 import com.agrmt.app.term.Keys
 import com.agrmt.app.ui.reconnectDelayMs
+import com.agrmt.app.ui.serverGroupLabel
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -27,5 +29,18 @@ class EscKeyTest {
     @Test
     fun escIsSingleEscapeByte() {
         assertEquals("\u001b", Keys.ESC)
+    }
+}
+
+class ServerLabelTest {
+
+    @Test
+    fun joinsAddrAndGroup() {
+        assertEquals("10.0.0.2:8989 - g1", serverGroupLabel(ServerConfig("10.0.0.2:8989", "g1")))
+    }
+
+    @Test
+    fun emptyWithoutConfig() {
+        assertEquals("", serverGroupLabel(null))
     }
 }
